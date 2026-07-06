@@ -1,0 +1,28 @@
+(ns gmail.labels-test
+  (:require [clojure.string :as str]
+            [clojure.test :refer [deftest is]]
+            [gmail.labels :as labels]))
+
+(defn- stub-http-fn [status body]
+  (fn [_req] {:status status :body body}))
+
+(deftest list-labels-unwraps-the-labels-key
+  (let [http-fn (stub-http-fn 200 "{\"labels\":[{\"id\":\"L1\",\"name\":\"todo\"}]}")]
+    (is (= [{:id "L1" :name "todo"}] (labels/list-labels {:http-fn http-fn :token "t"})))))
+
+(deftest find-label-returns-nil-when-absent
+  (let [http-fn (stub-http-fn 200 "{\"labels\":[{\"id\":\"L1\",\"name\":\"todo\"}]}")]
+    (is (nil? (labels/find-label "missing" {:http-fn http-fn :token "t"})))
+    (is (= {:id "L1" :name "todo"} (labels/find-label "todo" {:http-fn http-fn :token "t"})))))
+
+(deftest find-or-create-label-creates-only-when-missing
+  (let [calls (atom [])
+        http-fn (fn [{:keys [url method] :as req}]
+                  (swap! calls conj req)
+                  (if (str/ends-with? url "/labels")
+                    (case method
+                      :get {:status 200 :body "{\"labels\":[]}"}
+                      :post {:status 200 :body "{\"id\":\"L2\",\"name\":\"新規\"}"})
+                    {:status 404 :body "{}"}))]
+    (is (= "L2" (labels/find-or-create-label! "新規" {:http-fn http-fn :token "t"})))
+    (is (= [:get :post] (mapv :method @calls)))))

@@ -1,0 +1,33 @@
+(ns gmail.threads-test
+  (:require [clojure.test :refer [deftest is]]
+            [gmail.client :as client]
+            [gmail.threads :as threads]))
+
+(deftest list-threads-passes-q-max-results-and-page-token-as-query-params
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 200 :body "{\"threads\":[]}"})]
+    (threads/list-threads {:http-fn http-fn :token "t" :q "from:wise.com" :max-results 10 :page-token "p1"})
+    (is (re-find #"q=from:wise\.com" (:url @captured)))
+    (is (re-find #"maxResults=10" (:url @captured)))
+    (is (re-find #"pageToken=p1" (:url @captured)))))
+
+(deftest get-thread-hits-the-thread-by-id
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 200 :body "{\"id\":\"t1\"}"})]
+    (is (= {:id "t1"} (threads/get-thread "t1" {:http-fn http-fn :token "t"})))
+    (is (= (str client/api-base "/threads/t1") (:url @captured)))))
+
+(deftest modify-thread-posts-add-and-remove-label-ids
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 200 :body "{}"})]
+    (threads/modify-thread! "t1" {:add-label-ids ["Label_1"] :remove-label-ids ["INBOX"]}
+                            {:http-fn http-fn :token "t"})
+    (is (= (str client/api-base "/threads/t1/modify") (:url @captured)))
+    (is (= :post (:method @captured)))
+    (is (= "{\"addLabelIds\":[\"Label_1\"],\"removeLabelIds\":[\"INBOX\"]}" (:body @captured)))))
+
+(deftest archive-thread-removes-only-the-inbox-label
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 200 :body "{}"})]
+    (threads/archive-thread! "t1" {:http-fn http-fn :token "t"})
+    (is (= "{\"removeLabelIds\":[\"INBOX\"]}" (:body @captured)))))
