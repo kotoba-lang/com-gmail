@@ -25,7 +25,7 @@
 
 (deftest request-throws-on-non-2xx-transport-status
   (is (thrown-with-msg?
-       clojure.lang.ExceptionInfo
+       #?(:clj clojure.lang.ExceptionInfo :cljs js/Error)
        #"Gmail API request failed"
        (client/request! "/threads" {:http-fn (stub-http-fn 401 "{\"error\":\"denied\"}") :token "t"}))))
 
@@ -35,6 +35,6 @@
 
 (deftest access-token-fails-closed-without-env-or-explicit-token
   (is (thrown-with-msg?
-       clojure.lang.ExceptionInfo
+       #?(:clj clojure.lang.ExceptionInfo :cljs js/Error)
        #"GMAIL_ACCESS_TOKEN is required"
        (client/request! "/threads" {:http-fn (stub-http-fn 200 "{}")}))))
