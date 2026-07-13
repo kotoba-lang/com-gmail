@@ -63,7 +63,9 @@ deliberately left to the caller.
                        :body "..."
                        :thread-id thread-id
                        :in-reply-to "<original-msg-id@mail.gmail.com>"
-                       :references "<msg-1@mail.gmail.com> <msg-2@mail.gmail.com>"})  ; optional, full chain
+                       :references "<msg-1@mail.gmail.com> <msg-2@mail.gmail.com>"  ; optional, full chain
+                       :attachments [{:filename "diagram.svg" :content-type "image/svg+xml"
+                                     :bytes (.readAllBytes (java.io.FileInputStream. "diagram.svg"))}]})  ; optional
 ;; => {:id "draft-id" :message {...}}
 
 (require '[gmail.history :as history])
