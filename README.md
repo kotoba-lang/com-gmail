@@ -26,6 +26,7 @@ gmail.client  -- auth (Bearer OAuth2 access token) + HTTP (injectable :http-fn) 
 gmail.threads -- list/get threads, modify (add/remove label ids), archive
 gmail.labels  -- list, create, find-or-create (by display name)
 gmail.drafts  -- create a reply draft (plain-text RFC 2822, optionally attached to a thread)
+gmail.history -- users.history.list, for cursor-based incremental sync (what's changed since a historyId)
 ```
 
 Query construction and response parsing are pure `.cljc`. The actual HTTP
@@ -61,6 +62,12 @@ deliberately left to the caller.
                        :body "..."
                        :thread-id thread-id})
 ;; => {:id "draft-id" :message {...}}
+
+(require '[gmail.history :as history])
+;; persist :historyId from any prior response, feed it back in next poll
+(history/list-history last-seen-history-id)
+;; => {:history [{:id "..." :messagesAdded [...] ...} ...] :historyId "..."}
+;; a 404 here means the cursor is too old -- do a full resync via threads/list-threads
 ```
 
 ## Tests

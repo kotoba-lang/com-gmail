@@ -32,6 +32,7 @@ client  auth (Bearer access token) + HTTP (injectable :http-fn) + JSON request/r
 threads list / get / modify (label add-remove) / archive
 labels  list / create / find-or-create (by display name, resolving to a label id)
 drafts  RFC 2822 plain-text message builder + create-draft! (optionally thread-scoped)
+history users.history.list -- cursor-based "what changed since historyId" (incremental sync)
 ```
 
 ## Non-goals
@@ -53,3 +54,27 @@ drafts  RFC 2822 plain-text message builder + create-draft! (optionally thread-s
   state through this library without a code dependency between the two
   (same "shared vocabulary, no shared code" relationship as
   `kotoba-issue-clj`/`kotoba-ledger-clj`).
+
+## Addendum (2026-07-13): `gmail.history`
+
+`kotoba-lang/tayori`'s own `tayori.channel.email/list-new-messages` (ADR
+2607061500) returns `[]` unconditionally, with a code comment explaining why:
+Gmail's `threads.get`/`threads.list` have no "since" filter, so polling by
+`q`/date alone can't distinguish "new since last time" from "everything
+again" -- a real implementation needs `users.history.list` against a
+persisted `historyId` cursor, which this library didn't yet expose. Added
+`gmail.history/list-history` to close that gap (consumed first by
+`kotoba-lang/mail-archive`'s incremental sync; wiring it into tayori's own
+`list-new-messages` is a separate follow-up, not done here).
+
+**Known limitation carried over from `gmail.client/request!`**: its
+query-string builder (`(map (fn [[k v]] (str (name k) "=" v)) query)`)
+serializes one value per key and does not URL-encode. Gmail's
+`historyTypes` filter is a *repeated* query param
+(`historyTypes=X&historyTypes=Y`), which this shape cannot express --
+`gmail.history/list-history` intentionally does not expose a `history-types`
+param rather than silently mis-serializing one. Any caller needing to
+narrow the returned records to specific change types should filter the
+`:history` response client-side. Fixing this properly (real query-string
+encoding, repeated-key support) would touch `client.cljc`'s core request
+builder and is out of scope for this addition.
