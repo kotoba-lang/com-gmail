@@ -78,3 +78,15 @@ narrow the returned records to specific change types should filter the
 `:history` response client-side. Fixing this properly (real query-string
 encoding, repeated-key support) would touch `client.cljc`'s core request
 builder and is out of scope for this addition.
+
+## Addendum (2026-07-13): `drafts/->raw-message` gains `:cc` and `:references`
+
+A real reply-into-an-existing-thread case (multiple Cc'd recipients, more
+than one prior message) needed both: `:cc` accepts a single address string
+or a collection (joined with `", "`); `:references` lets a caller supply the
+full RFC 2822 References chain instead of the previous behavior of always
+mirroring `:in-reply-to` alone -- Gmail's own threading heuristic (and other
+clients') considers the whole chain, not just the immediate parent, so
+always collapsing References to one Message-ID under-informed threading on
+deep replies. `:references` is optional; omitting it preserves the old
+mirror-`:in-reply-to` behavior exactly, so this is additive/non-breaking.
