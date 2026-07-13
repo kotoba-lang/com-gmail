@@ -130,3 +130,44 @@
   ([draft-id] (delete-draft! draft-id {}))
   ([draft-id http-opts]
    (client/request! (str "/drafts/" draft-id) (assoc http-opts :method :delete)))))
+
+#?(:clj
+(defn get-draft!
+  "Fetch a draft by id (Gmail's drafts.get -- returns `{:id :message ...}`).
+  Read-side complement to create/update, so a caller can re-read what it
+  filed (e.g. to show the current body before editing it)."
+  ([draft-id] (get-draft! draft-id {}))
+  ([draft-id http-opts]
+   (client/request! (str "/drafts/" draft-id) http-opts))))
+
+#?(:clj
+(defn list-drafts!
+  "List drafts (Gmail's drafts.list), paginated via `:max-results`/
+  `:page-token` -- forwarded as `maxResults`/`pageToken`, the exact
+  query-param shape gmail.threads/list-threads uses -- so a caller can page
+  through outstanding drafts without re-deriving the pagination convention."
+  ([] (list-drafts! {}))
+  ([{:keys [max-results page-token] :as http-opts}]
+   (client/request! "/drafts"
+                    (assoc (dissoc http-opts :max-results :page-token)
+                           :query (cond-> {}
+                                    max-results (assoc :maxResults max-results)
+                                    page-token (assoc :pageToken page-token)))))))
+
+#?(:clj
+(defn update-draft!
+  "Replace a draft's content in place (Gmail's drafts.update -- PUT
+  /drafts/{id}) with a freshly built `->raw-message`, same `message` shape
+  as create-draft!. This closes the gap that previously forced a
+  delete-draft! + create-draft! cycle just to edit a draft's body: that
+  churned the draft id (breaking any reference a caller held) and briefly
+  left the thread with no draft at all. update-draft! keeps the id stable
+  and the edit atomic. Requires the :put transport branch added to
+  client/jvm-http-fn alongside this."
+  ([draft-id message] (update-draft! draft-id message {}))
+  ([draft-id {:keys [thread-id] :as message} http-opts]
+   (client/request! (str "/drafts/" draft-id)
+                    (assoc http-opts
+                           :method :put
+                           :body {:message (cond-> {:raw (->raw-message message)}
+                                             thread-id (assoc :threadId thread-id))})))))

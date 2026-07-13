@@ -31,3 +31,24 @@
         http-fn (fn [req] (reset! captured req) {:status 200 :body "{}"})]
     (threads/archive-thread! "t1" {:http-fn http-fn :token "t"})
     (is (= "{\"removeLabelIds\":[\"INBOX\"]}" (:body @captured)))))
+
+(deftest trash-thread-posts-to-the-trash-subresource
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 200 :body "{\"id\":\"t1\"}"})]
+    (threads/trash-thread! "t1" {:http-fn http-fn :token "t"})
+    (is (= :post (:method @captured)))
+    (is (= (str client/api-base "/threads/t1/trash") (:url @captured)))))
+
+(deftest untrash-thread-posts-to-the-untrash-subresource
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 200 :body "{\"id\":\"t1\"}"})]
+    (threads/untrash-thread! "t1" {:http-fn http-fn :token "t"})
+    (is (= :post (:method @captured)))
+    (is (= (str client/api-base "/threads/t1/untrash") (:url @captured)))))
+
+(deftest delete-thread-issues-a-permanent-delete-by-id
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 204 :body ""})]
+    (is (nil? (threads/delete-thread! "t1" {:http-fn http-fn :token "t"})))
+    (is (= :delete (:method @captured)))
+    (is (= (str client/api-base "/threads/t1") (:url @captured)))))

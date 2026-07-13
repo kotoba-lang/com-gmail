@@ -26,3 +26,10 @@
                     {:status 404 :body "{}"}))]
     (is (= "L2" (labels/find-or-create-label! "新規" {:http-fn http-fn :token "t"})))
     (is (= [:get :post] (mapv :method @calls)))))
+
+(deftest delete-label-issues-a-delete-to-the-label-by-id
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 204 :body ""})]
+    (is (nil? (labels/delete-label! "L1" {:http-fn http-fn :token "t"})))
+    (is (= :delete (:method @captured)))
+    (is (str/ends-with? (:url @captured) "/labels/L1"))))

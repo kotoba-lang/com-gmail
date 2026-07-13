@@ -1,6 +1,7 @@
 (ns gmail.drafts-test
   (:require [clojure.test :refer [deftest is]]
             [clojure.string :as str]
+            [gmail.client :as client]
             [gmail.drafts :as drafts])
   #?(:clj (:import [java.util Base64])))
 
@@ -94,3 +95,29 @@
     (is (nil? (drafts/delete-draft! "d1" {:http-fn http-fn :token "tok"})))
     (is (= :delete (:method @captured)))
     (is (re-find #"/drafts/d1$" (:url @captured)))))
+
+(deftest get-draft-hits-the-draft-by-id
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 200 :body "{\"id\":\"d1\"}"})]
+    (is (= {:id "d1"} (drafts/get-draft! "d1" {:http-fn http-fn :token "t"})))
+    (is (= (str client/api-base "/drafts/d1") (:url @captured)))
+    (is (= :get (:method @captured)))))
+
+(deftest list-drafts-passes-max-results-and-page-token-as-query-params
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 200 :body "{\"drafts\":[]}"})]
+    (drafts/list-drafts! {:http-fn http-fn :token "t" :max-results 25 :page-token "p1"})
+    (is (str/starts-with? (:url @captured) (str client/api-base "/drafts?")))
+    (is (re-find #"maxResults=25" (:url @captured)))
+    (is (re-find #"pageToken=p1" (:url @captured)))))
+
+(deftest update-draft-puts-the-raw-message-to-the-draft-by-id
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 200 :body "{\"id\":\"d1\"}"})]
+    (drafts/update-draft! "d1" {:to "a@example.com" :subject "hi" :body "hello v2" :thread-id "t1"}
+                          {:http-fn http-fn :token "tok"})
+    (is (= :put (:method @captured)))
+    (is (= (str client/api-base "/drafts/d1") (:url @captured)))
+    (let [body (:body @captured)]
+      (is (re-find #"\"threadId\":\"t1\"" body))
+      (is (re-find #"\"raw\":" body)))))
