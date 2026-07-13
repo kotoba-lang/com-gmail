@@ -40,9 +40,10 @@ history users.history.list -- cursor-based "what changed since historyId" (incre
 - The OAuth2 consent/refresh flow itself -- callers supply a valid access
   token (env `GMAIL_ACCESS_TOKEN` or explicit `:token`), mirroring
   `cloudflare.client`'s `CLOUDFLARE_API_TOKEN` convention.
-- HTML/multipart draft bodies -- `drafts/->raw-message` builds a minimal
-  plain-text message only; richer MIME construction is left to callers who
-  need it (or a follow-up namespace).
+- HTML draft bodies -- `drafts/->raw-message` builds a plain-text body only
+  (multipart/mixed for file attachments is supported as of the 2026-07-13
+  addendum below; multipart/alternative for an HTML+plain-text body pair is
+  not).
 
 ## Consequences
 
@@ -90,3 +91,18 @@ clients') considers the whole chain, not just the immediate parent, so
 always collapsing References to one Message-ID under-informed threading on
 deep replies. `:references` is optional; omitting it preserves the old
 mirror-`:in-reply-to` behavior exactly, so this is additive/non-breaking.
+
+## Addendum (2026-07-13): `drafts/->raw-message` gains `:attachments`
+
+A reply needed to carry reference diagrams (SVG) alongside the text body.
+`:attachments` is a collection of `{:filename :content-type :bytes}`;
+when present the message becomes `multipart/mixed` (a `text/plain` part
+plus one part per attachment, base64-encoded with RFC 2045 line wrapping
+via `Base64/getMimeEncoder` -- a *different* encoding layer than the
+URL-safe, unwrapped encoding the outer `message.raw` field itself needs;
+conflating the two silently produces a draft Gmail can't render). Omitting
+`:attachments` keeps the exact prior single-part plain-text shape
+(verified byte-for-byte via a dedicated test), so this is additive/
+non-breaking. This namespace does no filesystem I/O -- callers read
+attachment bytes themselves, keeping `->raw-message` testable with plain
+byte arrays and no real files.
