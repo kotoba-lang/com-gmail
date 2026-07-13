@@ -22,14 +22,38 @@ role `com-cloudflare` plays for Cloudflare.
 ## Design
 
 ```text
-gmail.client      -- auth (Bearer OAuth2 access token) + HTTP (injectable :http-fn) + JSON envelope
+gmail.client      -- auth (Bearer OAuth2 access token) + HTTP (injectable :http-fn) + JSON envelope; opt-in :retry
 gmail.threads     -- list/get threads, modify (add/remove label ids), archive, trash/untrash, delete
 gmail.labels      -- list, create, find-or-create (by display name), delete
 gmail.drafts      -- get/list/create/update/delete a reply draft (plain-text RFC 2822, optional attachments/thread)
 gmail.history     -- users.history.list, for cursor-based incremental sync (what's changed since a historyId)
 gmail.mime        -- decode inbound messages: body data, headers, plain-text/html body, attachment descriptors
 gmail.attachments -- download an inbound attachment's raw bytes (users.messages.attachments.get)
+gmail.retry       -- retry/backoff (full-jitter exponential) for transient 429/5xx failures; wired into client via :retry
+gmail.watch       -- users.watch / users.stop push-notification lifecycle (Gmail-side calls only; GCP setup out of scope)
 ```
+
+### Sync (JVM) vs async (cljs/nbb) surfaces
+
+Everything above is the original **synchronous** surface (`.cljc`, JVM-only in
+practice -- every function is `#?(:clj ...)`-wrapped): a `:http-fn` returns a
+plain `{:status :body}`. Alongside it there is a separate, **cljs/nbb-only,
+async** read surface -- its `:http-fn` returns a `js/Promise` of
+`{:status :body}` and its functions return Promises:
+
+```text
+gmail.async-client   -- cljs/nbb-only async request core (js/fetch default transport, returns js/Promise)
+gmail.async-threads  -- cljs/nbb-only, async, READ-ONLY: list-threads / get-thread (returns js/Promise)
+gmail.async-history  -- cljs/nbb-only, async, READ-ONLY: list-history (returns js/Promise)
+```
+
+The async namespaces are **NOT a port** of the sync API -- they cover only the
+read-only ("inbound polling") operations (`list-threads` / `get-thread` /
+`list-history`) that motivated `gmail.history`, for the nbb-side use case
+(e.g. `kotoba-lang/tayori`'s incremental sync). The synchronous `:http-fn`
+contract is deliberately left unchanged (it is shared with `com-cloudflare` /
+`com-wise`); the async surface is additive. See the ADR addendum "a parallel
+async cljs read surface" for the full rationale.
 
 Query construction and response parsing are pure `.cljc`. The actual HTTP
 call is JVM-only by default (`java.net.http`) but every function takes an
@@ -99,13 +123,52 @@ deliberately left to the caller.
 ;; Trash is reversible (retained ~30 days); delete is PERMANENT -- prefer trash:
 (threads/trash-thread! thread-id)     ; reversible via (threads/untrash-thread! thread-id)
 ;; (threads/delete-thread! thread-id) ; PERMANENT, bypasses Trash -- no undo
+
+;; Opt-in retry/backoff for transient 429/5xx failures (omit :retry for the
+;; exact prior no-retry behavior). :retry true == defaults (5 attempts,
+;; full-jitter exponential backoff); or pass a map of gmail.retry opts:
+(threads/list-threads {:q "from:wise.com" :retry true})
+(threads/list-threads {:q "from:wise.com" :retry {:max-attempts 4 :base-ms 250 :max-ms 10000}})
+;; A 401/403/404 still fails on the first try -- only 429/5xx are retried.
+
+;; Push notifications: register a Pub/Sub topic (users.watch), later stop it.
+;; NOTE: this only makes the Gmail-side calls -- you must provision the topic,
+;; grant gmail-api-push@system.gserviceaccount.com publish rights on it, and
+;; run the subscriber yourself (all out of scope here). Watch expires in ~7
+;; days; renew before :expiration.
+(require '[gmail.watch :as watch])
+(watch/watch! "projects/my-gcp-project/topics/gmail-push" {:label-ids ["INBOX"]})
+;; => {:historyId "..." :expiration "1700000000000"}  ; seed history/list-history with :historyId
+(watch/stop!)   ; cancel all push notifications for the mailbox
+```
+
+### Async (cljs/nbb) read surface
+
+```clojure
+;; cljs/nbb only -- returns js/Promise, read-only. Not a port of the sync API.
+(require '[gmail.async-threads :as at]
+         '[gmail.async-history :as ah])
+
+(-> (at/list-threads {:token access-token :q "in:inbox"})
+    (.then (fn [{:keys [threads]}] (js/console.log (count threads))))
+    (.catch (fn [err] (js/console.error (ex-data err)))))  ; {:status :path :body}
+
+(-> (ah/list-history last-seen-history-id {:token access-token})
+    (.then (fn [{:keys [history historyId]}] ...))
+    (.catch (fn [err]  ; a 404 here means the cursor is too old -- full resync
+              (when (= 404 (:status (ex-data err))) (full-resync!)))))
 ```
 
 ## Tests
 
 ```sh
-clojure -M:test
+clojure -M:test          # JVM: every .cljc namespace (client/threads/labels/drafts/
+                         #      history/mime/attachments/retry/watch), stubbed :http-fn
+npm ci && npm run test:nbb   # cljs/nbb: the async read surface (gmail.async-*)
 ```
 
-No live account required -- every test injects a stub `:http-fn` and asserts
-on the request shape (`cloudflare.client-test`'s pattern).
+No live account required -- every test injects a stub `:http-fn` and asserts on
+the request shape (`cloudflare.client-test`'s pattern); the async tests inject a
+stub `:http-fn` returning `(js/Promise.resolve {:status .. :body ..})` and assert
+on resolved/rejected Promise values (nbb, mail-archive's self-contained-script
+convention).

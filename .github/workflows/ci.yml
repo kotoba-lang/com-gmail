@@ -16,5 +16,11 @@ jobs:
       - uses: DeLaGuardo/setup-clojure@13.4
         with:
           cli: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - run: clojure -M:test
       - run: clojure -M:lint
+      # cljs-only async read surface (gmail.async-*) -- nbb tests
+      - run: npm ci
+      - run: npm run test:nbb
