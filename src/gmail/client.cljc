@@ -14,6 +14,7 @@
   pass a valid token, the same way cloudflare.client expects a
   CLOUDFLARE_API_TOKEN rather than performing its own auth flow."
   (:require [clojure.string :as str]
+            #?(:clj [gmail.retry :as retry])
             #?(:clj [clojure.data.json :as json])))
 
 (def api-base "https://gmail.googleapis.com/gmail/v1/users/me")
@@ -92,18 +93,33 @@
   (default :get), :body (a map, JSON-encoded), :query (a map of query
   params), :http-fn, :token. Returns the parsed JSON body, or nil for an
   empty body (Gmail returns an empty 200 for some modify calls). Throws on
-  a transport-level non-2xx status."
+  a transport-level non-2xx status.
+
+  `:retry` (optional, OPT-IN) turns on retry/backoff for transient failures
+  via gmail.retry/with-retry: pass `true` for the defaults (5 attempts,
+  full-jitter exponential backoff) or a map of gmail.retry/with-retry opts
+  (`{:max-attempts N :base-ms M :max-ms K :sleep-fn f}`). OMITTING `:retry`
+  entirely preserves the exact prior behavior byte-for-byte -- one request,
+  throw immediately on the first non-2xx -- so this is additive/non-breaking
+  for every existing caller (and for com-cloudflare/com-wise, which share the
+  sync `:http-fn` convention). Only the transient statuses 429/5xx are
+  retried; a 401/403/404 still throws on the first try."
   ([path] (request! path {}))
-  ([path {:keys [method body http-fn token query]
+  ([path {:keys [method body http-fn token query retry]
           :or {method :get http-fn (jvm-http-fn)}}]
    (let [query-string (when (seq query)
                         (str "?" (str/join "&" (map (fn [[k v]] (str (name k) "=" (encode-query-value v))) query))))
-         resp (http-fn (cond-> {:url (str api-base path query-string)
-                                :method method
-                                :headers (auth-headers (or token (access-token)))}
-                        body (assoc :body (json/write-str body))))]
-     (when-not (< (:status resp) 300)
-       (throw (ex-info "Gmail API request failed"
-                       {:status (:status resp) :path path :body (:body resp)})))
-     (when (seq (:body resp))
-       (json/read-str (:body resp) :key-fn keyword))))))
+         req (cond-> {:url (str api-base path query-string)
+                      :method method
+                      :headers (auth-headers (or token (access-token)))}
+               body (assoc :body (json/write-str body)))
+         do-request (fn []
+                      (let [resp (http-fn req)]
+                        (when-not (< (:status resp) 300)
+                          (throw (ex-info "Gmail API request failed"
+                                          {:status (:status resp) :path path :body (:body resp)})))
+                        (when (seq (:body resp))
+                          (json/read-str (:body resp) :key-fn keyword))))]
+     (if retry
+       (retry/with-retry do-request (if (map? retry) retry {}))
+       (do-request))))))

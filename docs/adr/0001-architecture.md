@@ -217,3 +217,126 @@ to `%2B`/`%26`). This is a strictly smaller, uncontroversial bug fix and does
 **not** add repeated-key support -- that larger design decision (needed for
 `historyTypes` and other array params) remains documented as out of scope in
 the `gmail.history` addendum above, unchanged.
+
+## Addendum (2026-07-13): `gmail.retry` -- opt-in retry/backoff, wired into `client/request!`
+
+Nothing in this library shared a retry/backoff utility before -- a caller
+hitting Gmail's transient failures (a 429 rate limit, a 5xx backend hiccup)
+had to hand-roll its own loop. `gmail.retry` is the first reusable one:
+
+- `retryable-status?` -- `429` and `500/502/503/504` only. A 4xx other than
+  429 (400/401/403/404) is a caller/permission/not-found problem retrying
+  can't fix, so it is deliberately excluded (as is a `nil` status -- the case
+  when the thrown exception carried no `:status`, e.g. a plain programming
+  bug, which must not be looped on).
+- `backoff-delay-ms` -- **full-jitter** exponential backoff: an exponential
+  ceiling `base-ms * 2^attempt`, capped at `max-ms`, then a *uniform random*
+  draw in `[0, capped]`. The jitter is the point (AWS's "Exponential Backoff
+  And Jitter"): without it, concurrent retriers all wake on the same doubling
+  boundary and re-stampede the API in lockstep -- the thundering-herd failure
+  mode of naive fixed-doubling backoff. Defaults: `base-ms` 500, `max-ms`
+  30000, `max-attempts` 5, all configurable via an opts map.
+- `with-retry` is the one `#?(:clj ...)`-wrapped form (a synchronous loop with
+  `Thread/sleep`); the decision logic above is pure, portable `.cljc`. It
+  takes a 0-arg `thunk` that throws `ex-info` carrying `{:status N}` on
+  failure -- the **exact shape `client/request!` already throws** -- and
+  re-throws the *original* exception untouched once attempts are exhausted or
+  the status is non-retryable, so a caller sees the same error it would
+  without retry, just later. `:sleep-fn` is injectable (default
+  `#(Thread/sleep %)`) so tests pass a no-op and stay fast, the same
+  injectable-fn discipline as `:http-fn`.
+
+Wired into `client/request!` as an **opt-in** `:retry` opt (`true` for
+defaults, or a map of `with-retry` opts). **Omitting `:retry` preserves the
+prior behavior exactly** -- one request, throw immediately on the first
+non-2xx (verified by a test asserting a single `:http-fn` call and an
+immediate throw when `:retry` is absent) -- so this is additive/non-breaking
+for every existing caller, and for `com-cloudflare`/`com-wise` which share the
+sync `:http-fn` convention. The refactor only lifts the per-request body into
+a local `do-request` thunk so `with-retry` can re-invoke it; the no-retry
+branch calls that thunk once, byte-identically to before.
+
+## Addendum (2026-07-13): `gmail.watch` -- `users.watch` / `users.stop`
+
+Gmail push-notification lifecycle, the same thin-wrapper shape as
+`gmail.history`'s addition:
+
+- `watch!` -- `POST /watch` with `{:topicName "projects/<p>/topics/<t>"
+  :labelIds [...]}` (`:label-ids` optional -- filters which label changes fire
+  a notification); returns `{:historyId ... :expiration ...}`. `:expiration`
+  is a Unix-ms string ~7 days out; a watch must be renewed before it or
+  notifications silently stop. `:historyId` seeds `gmail.history/list-history`
+  -- the notification payload only carries a `historyId`, so the actual
+  changes are still read via the history cursor.
+- `stop!` -- `POST /stop`, no body, empty response (surfaced as `nil`);
+  cancels all push notifications for the mailbox.
+
+**Explicitly out of scope** (documented in the ns docstring, the README, and
+here), mirroring how OAuth2 token acquisition is out of scope for
+`gmail.client`: this namespace **only** makes the two Gmail-side API calls. It
+does **not** (1) provision the Cloud Pub/Sub topic, (2) grant the Gmail push
+service account `gmail-api-push@system.gserviceaccount.com` the Pub/Sub
+Publisher role on that topic, or (3) run the receiving webhook/subscriber. All
+three are caller-side GCP infrastructure prerequisites; `watch!` assumes the
+topic already exists and is publishable-to. Tested with a stub `:http-fn` like
+every other namespace.
+
+## Addendum (2026-07-13): a parallel async cljs read surface (`gmail.async-*`)
+
+This repo is JVM-only despite the `.cljc` extension -- every function is
+`#?(:clj ...)`-wrapped and there are no `:cljs` branches anywhere. The reason
+it can't simply "also run under cljs" is a contract tension, not laziness: the
+`:http-fn` convention used throughout this library (and shared with
+`com-cloudflare`/`com-wise`) is **synchronous** -- `{:url :method ...} ->
+{:status :body}`, a plain return value -- but `js/fetch` under nbb/cljs is
+inherently **async** (returns a Promise). An abandoned sketch in
+`kotoba-lang/browser`'s `src/browser/net/http.cljc` had already named this
+exact blocker in its own docstring.
+
+Decision (made, not revisited here): do **not** change the synchronous
+`:http-fn` contract -- it must stay byte-identical, zero risk to the
+`com-cloudflare`/`com-wise` code that shares it (a breaking change there is
+exactly what's being avoided). Instead add a **separate, additional,
+cljs-only, read-only** surface that is async-native (returns `js/Promise`)
+from day one, in its own namespaces so there is never ambiguity about which
+functions are sync (existing, JVM) vs async (new, cljs):
+
+- `gmail.async-client` (plain `.cljs`, no reader-conditional -- there's no JVM
+  branch to share) -- its own minimal request core: `fetch-http-fn` (js/fetch
+  wrapped to resolve to `{:status :body}`, the *same field shape* as the sync
+  contract, just inside a Promise) and `request!` (same opts-map shape --
+  `:method :body :http-fn :token :query` -- but returns a `js/Promise` of the
+  parsed body, **rejecting** on non-2xx with the same `{:status :path :body}`
+  data the sync client throws). Reuses `gmail.client/api-base` (a plain,
+  portable `def`) rather than redefining it.
+- `gmail.async-threads` -- `list-threads` / `get-thread`.
+- `gmail.async-history` -- `list-history`.
+
+**Scope is read-only inbound polling only** -- the historical use case that
+motivated `gmail.history` (`kotoba-lang/tayori`'s incremental sync, exactly
+the nbb-not-JVM kind of loop). This is deliberately **NOT a port**: drafts /
+labels / mime / attachments / watch / retry are *not* mirrored on the async
+side. Every function still takes an injectable `:http-fn` (a stub returns
+`(js/Promise.resolve {:status .. :body ..})`), preserving this library's one
+non-negotiable convention across both surfaces.
+
+Two implementation notes worth recording:
+- **Rejection via `js/Promise.reject`, not `throw`, inside a `.then`.** Under
+  nbb/SCI a `(throw (ex-info ...))` inside an interpreted `.then` callback gets
+  wrapped in an `sci/error` whose `ex-data` *hides* the original
+  `{:status :path :body}` (a caller's `.catch` then can't read the status).
+  Returning a rejected promise carries the raw ex-info through intact, and
+  behaves identically under a compiled cljs build -- so `request!` rejects that
+  way. (Verified: a stubbed 401 rejects with `(:status (ex-data e))` = 401.)
+- **nbb test infra.** This repo had none; added a minimal `package.json`
+  (only `nbb` as a devDependency -- no unrelated npm deps) and `nbb.edn`
+  (`{:paths ["src" "test"]}`), matching `kotoba-lang/mail-archive`'s shape. The
+  async tests follow mail-archive's `datascript_contract_test.cljs`
+  convention -- a self-contained nbb script with a manual `check`/failures atom
+  and `js/process.exit 1` on mismatch (this repo's nbb pattern, **not**
+  cljs.test) -- extended to await Promises via a sequential `.then` chain. Run
+  with `npm run test:nbb` (which chains `npx nbb test/gmail/async_*_test.cljs`);
+  CI grows a Node step alongside the existing `clojure -M:test`/`-M:lint`. The
+  reused `.cljc` (`gmail.client`) loads fine under nbb because its `#?(:clj
+  ...)` forms simply drop out under cljs, leaving only the portable
+  `api-base`.

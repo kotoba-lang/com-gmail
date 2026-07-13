@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "devDependencies": {
+    "nbb": "^1.4.210"
+  },
+  "scripts": {
+    "test:nbb": "nbb test/gmail/async_client_test.cljs && nbb test/gmail/async_threads_test.cljs && nbb test/gmail/async_history_test.cljs"
+  }
+}
