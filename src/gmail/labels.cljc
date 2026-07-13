@@ -28,3 +28,15 @@
   ([label-name] (find-or-create-label! label-name {}))
   ([label-name http-opts]
    (:id (or (find-label label-name http-opts) (create-label! label-name http-opts))))))
+
+#?(:clj
+(defn delete-label!
+  "Delete a user label by id (Gmail's users.labels.delete, DELETE
+  /labels/{id}) -- it's removed from every thread/message that carried it.
+  Only user-created labels can be deleted; Gmail rejects a delete of a
+  system label (INBOX/SENT/SPAM/...). The label id, not its display name --
+  resolve one via find-label first if you only have the name. Gmail returns
+  an empty success body, which client/request! surfaces as nil."
+  ([label-id] (delete-label! label-id {}))
+  ([label-id http-opts]
+   (client/request! (str "/labels/" label-id) (assoc http-opts :method :delete)))))

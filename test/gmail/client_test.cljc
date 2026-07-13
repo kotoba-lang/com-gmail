@@ -23,6 +23,28 @@
     (is (re-find #"q=wise" (:url @captured)))
     (is (re-find #"maxResults=10" (:url @captured)))))
 
+(deftest request-percent-encodes-query-values-with-spaces-and-special-chars
+  ;; a real Gmail search value with a space, an `&`, and a `+` -- none of
+  ;; these may leak through unescaped or they'd corrupt the query-string
+  ;; syntax. Spaces must become %20 (NOT `+`, which is form-encoding, not
+  ;; URI-encoding). `:` and `/` stay readable (legal in a URI query, and
+  ;; Gmail's `after:2024/01/01` relies on them).
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 200 :body "{}"})]
+    (client/request! "/threads"
+                     {:http-fn http-fn :token "t"
+                      :query {:q "after:2024/01/01 in:inbox & a+b"}})
+    (let [url (:url @captured)]
+      ;; space -> %20, not +
+      (is (re-find #"q=after:2024/01/01%20in:inbox" url))
+      (is (not (re-find #"q=[^&]*\+" url)))            ; no bare + anywhere in the value
+      ;; literal & escaped so it can't be read as a param separator
+      (is (re-find #"%26" url))
+      ;; literal + (the one between a and b) escaped to %2B
+      (is (re-find #"a%2Bb" url))
+      ;; `:` and `/` left readable
+      (is (re-find #"after:2024/01/01" url)))))
+
 (deftest request-throws-on-non-2xx-transport-status
   (is (thrown-with-msg?
        #?(:clj clojure.lang.ExceptionInfo :cljs js/Error)

@@ -33,6 +33,9 @@
                               (.POST (java.net.http.HttpRequest$BodyPublishers/ofString (or body "")))
                               .build)
                      :get (-> builder .GET .build)
+                     :put (-> builder
+                             (.PUT (java.net.http.HttpRequest$BodyPublishers/ofString (or body "")))
+                             .build)
                      :delete (-> builder .DELETE .build)
                      (throw (ex-info "Unsupported HTTP method" {:method method})))
            resp (.send (java.net.http.HttpClient/newHttpClient) request
@@ -53,6 +56,36 @@
    "Content-Type" "application/json"}))
 
 #?(:clj
+(defn- encode-query-value
+  "Percent-encode a query-param VALUE so a Gmail search string like
+  \"after:2024/01/01 in:inbox\" (spaces) or any value carrying `&`/`+`/`=`/
+  non-ASCII survives intact in the URL instead of corrupting the
+  query-string syntax. java.net.URLEncoder is deliberately NOT used: it is
+  application/x-www-form-urlencoded, which serializes a space as `+` (a
+  literal `+` in a URI, not a space -- ambiguous) and over-encodes `:`/`/`,
+  the two characters Gmail search syntax (`from:`, `after:2024/01/01`) most
+  needs to stay readable and that RFC 3986 already permits unencoded in a
+  query component. Instead: keep RFC 3986 `unreserved` (ALPHA/DIGIT/`-._~`)
+  plus the query-legal `:`/`/`, and percent-encode every other byte (UTF-8),
+  so the delimiters space/`&`/`=`/`+`/`#` can never be misread as syntax.
+  Keys are left unencoded on purpose -- in this codebase they are always
+  simple identifiers (q/maxResults/pageToken). This does NOT add repeated-key
+  support (still one value per key) -- that larger design decision stays
+  documented as out of scope in gmail.history's ADR addendum."
+  ^String [v]
+  (let [sb (StringBuilder.)]
+    (doseq [b (.getBytes (str v) "UTF-8")]
+      (let [c (bit-and b 0xff)
+            ch (char c)]
+        (if (or (and (>= c (int \A)) (<= c (int \Z)))
+                (and (>= c (int \a)) (<= c (int \z)))
+                (and (>= c (int \0)) (<= c (int \9)))
+                (contains? #{\- \. \_ \~ \: \/} ch))
+          (.append sb ch)
+          (.append sb (format "%%%02X" c)))))
+    (.toString sb))))
+
+#?(:clj
 (defn request!
   "Call a Gmail API v1 endpoint. `path` is relative to api-base (e.g.
   \"/threads\" or (str \"/threads/\" thread-id)). `opts` accepts :method
@@ -64,7 +97,7 @@
   ([path {:keys [method body http-fn token query]
           :or {method :get http-fn (jvm-http-fn)}}]
    (let [query-string (when (seq query)
-                        (str "?" (str/join "&" (map (fn [[k v]] (str (name k) "=" v)) query))))
+                        (str "?" (str/join "&" (map (fn [[k v]] (str (name k) "=" (encode-query-value v))) query))))
          resp (http-fn (cond-> {:url (str api-base path query-string)
                                 :method method
                                 :headers (auth-headers (or token (access-token)))}

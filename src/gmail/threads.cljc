@@ -41,3 +41,36 @@
   ([thread-id] (archive-thread! thread-id {}))
   ([thread-id http-opts]
    (modify-thread! thread-id {:remove-label-ids ["INBOX"]} http-opts))))
+
+#?(:clj
+(defn trash-thread!
+  "Move every message in a thread to Trash (Gmail's threads.trash, POST
+  /threads/{id}/trash). REVERSIBLE -- Trash retains the thread (~30 days by
+  Gmail's policy) and untrash-thread! restores it. This is deliberately
+  distinct from delete-thread!, which is permanent: reach for this one
+  unless you truly mean to bypass Trash."
+  ([thread-id] (trash-thread! thread-id {}))
+  ([thread-id http-opts]
+   (client/request! (str "/threads/" thread-id "/trash") (assoc http-opts :method :post)))))
+
+#?(:clj
+(defn untrash-thread!
+  "Restore a thread from Trash (Gmail's threads.untrash, POST
+  /threads/{id}/untrash) -- the inverse of trash-thread!. Exposed alongside
+  trash-thread! on purpose: a trash without an untrash is a trap, leaving a
+  caller that trashed a thread with no programmatic way to pull it back
+  short of the Gmail UI."
+  ([thread-id] (untrash-thread! thread-id {}))
+  ([thread-id http-opts]
+   (client/request! (str "/threads/" thread-id "/untrash") (assoc http-opts :method :post)))))
+
+#?(:clj
+(defn delete-thread!
+  "PERMANENTLY delete a thread and all its messages (Gmail's threads.delete,
+  DELETE /threads/{id}). PERMANENT -- bypasses Trash entirely, Gmail does
+  not support undoing this. Most callers want trash-thread! instead (which
+  is reversible). Also note this needs the broad https://mail.google.com/
+  scope; the narrower gmail.modify scope can trash but not delete."
+  ([thread-id] (delete-thread! thread-id {}))
+  ([thread-id http-opts]
+   (client/request! (str "/threads/" thread-id) (assoc http-opts :method :delete)))))
