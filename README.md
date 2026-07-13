@@ -25,7 +25,7 @@ role `com-cloudflare` plays for Cloudflare.
 gmail.client  -- auth (Bearer OAuth2 access token) + HTTP (injectable :http-fn) + JSON envelope
 gmail.threads -- list/get threads, modify (add/remove label ids), archive
 gmail.labels  -- list, create, find-or-create (by display name)
-gmail.drafts  -- create a reply draft (plain-text RFC 2822, optionally attached to a thread)
+gmail.drafts  -- create/delete a reply draft (plain-text RFC 2822, optional attachments/thread)
 gmail.history -- users.history.list, for cursor-based incremental sync (what's changed since a historyId)
 ```
 

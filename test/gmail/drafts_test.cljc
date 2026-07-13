@@ -87,3 +87,10 @@
     (let [body (:body @captured)]
       (is (re-find #"\"threadId\":\"t1\"" body))
       (is (re-find #"\"raw\":" body)))))
+
+(deftest delete-draft-issues-a-delete-to-the-draft-by-id
+  (let [captured (atom nil)
+        http-fn (fn [req] (reset! captured req) {:status 204 :body ""})]
+    (is (nil? (drafts/delete-draft! "d1" {:http-fn http-fn :token "tok"})))
+    (is (= :delete (:method @captured)))
+    (is (re-find #"/drafts/d1$" (:url @captured)))))

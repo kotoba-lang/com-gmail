@@ -120,3 +120,13 @@
                            :method :post
                            :body {:message (cond-> {:raw (->raw-message message)}
                                              thread-id (assoc :threadId thread-id))})))))
+
+#?(:clj
+(defn delete-draft!
+  "Permanently delete a draft by id (Gmail's drafts.delete -- irreversible,
+  unlike moving a message to trash). Gmail returns an empty 204 body on
+  success, which client/request! already treats as nil rather than trying
+  to parse it as JSON."
+  ([draft-id] (delete-draft! draft-id {}))
+  ([draft-id http-opts]
+   (client/request! (str "/drafts/" draft-id) (assoc http-opts :method :delete)))))

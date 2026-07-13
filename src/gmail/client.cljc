@@ -33,6 +33,7 @@
                               (.POST (java.net.http.HttpRequest$BodyPublishers/ofString (or body "")))
                               .build)
                      :get (-> builder .GET .build)
+                     :delete (-> builder .DELETE .build)
                      (throw (ex-info "Unsupported HTTP method" {:method method})))
            resp (.send (java.net.http.HttpClient/newHttpClient) request
                       (java.net.http.HttpResponse$BodyHandlers/ofString))]

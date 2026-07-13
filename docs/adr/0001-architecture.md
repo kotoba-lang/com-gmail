@@ -106,3 +106,14 @@ conflating the two silently produces a draft Gmail can't render). Omitting
 non-breaking. This namespace does no filesystem I/O -- callers read
 attachment bytes themselves, keeping `->raw-message` testable with plain
 byte arrays and no real files.
+
+## Addendum (2026-07-13): `client/jvm-http-fn` gains `:delete`, `drafts/delete-draft!`
+
+`jvm-http-fn`'s method dispatch only built `:get`/`:post` requests --
+anything else threw `"Unsupported HTTP method"`, discovered when trying to
+retire a superseded draft before creating its replacement. Added `:delete`
+(`HttpRequest.Builder/DELETE`) and `drafts/delete-draft!` (`DELETE
+/drafts/{id}`, matching `create-draft!`'s injectable-`:http-fn`
+convention). Gmail's `drafts.delete` returns an empty 204 body, which
+`client/request!` already treats as `nil` rather than a JSON parse
+target -- no change needed there.
