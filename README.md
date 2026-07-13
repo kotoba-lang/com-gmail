@@ -58,9 +58,12 @@ deliberately left to the caller.
 (threads/modify-thread! thread-id {:add-label-ids [todo-label-id]})
 
 (drafts/create-draft! {:to "reply@support.example.com"
+                       :cc ["cc1@example.com" "cc2@example.com"]  ; optional, string or collection
                        :subject "Re: Action needed"
                        :body "..."
-                       :thread-id thread-id})
+                       :thread-id thread-id
+                       :in-reply-to "<original-msg-id@mail.gmail.com>"
+                       :references "<msg-1@mail.gmail.com> <msg-2@mail.gmail.com>"})  ; optional, full chain
 ;; => {:id "draft-id" :message {...}}
 
 (require '[gmail.history :as history])
