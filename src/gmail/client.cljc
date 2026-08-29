@@ -15,7 +15,7 @@
   CLOUDFLARE_API_TOKEN rather than performing its own auth flow."
   (:require [clojure.string :as str]
             #?(:clj [gmail.retry :as retry])
-            #?(:clj [clojure.data.json :as json])))
+            #?(:clj [json.data-json :as json])))
 
 (def api-base "https://gmail.googleapis.com/gmail/v1/users/me")
 
