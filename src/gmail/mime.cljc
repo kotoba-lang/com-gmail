@@ -15,7 +15,7 @@
 
   Pure `.cljc` shape; the base64 decode is JVM-only (`java.util.Base64`),
   the same single-platform posture as gmail.drafts' encoder."
-  (:require [clojure.string :as str])
+  (:require [kotoba.lang.text :as str])
   #?(:clj (:import [java.util Base64])))
 
 #?(:clj
@@ -38,8 +38,8 @@
   caller shouldn't have to know whether a given sender wrote `Message-ID`
   or `message-id` -- `(header payload \"message-id\")` finds either."
   [payload name]
-  (let [target (str/lower-case name)]
-    (some (fn [h] (when (= target (str/lower-case (str (:name h)))) (:value h)))
+  (let [target (str/lower name)]
+    (some (fn [h] (when (= target (str/lower (str (:name h)))) (:value h)))
           (:headers payload)))))
 
 #?(:clj

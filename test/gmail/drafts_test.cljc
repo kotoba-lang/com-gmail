@@ -1,6 +1,6 @@
 (ns gmail.drafts-test
   (:require [clojure.test :refer [deftest is]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [gmail.client :as client]
             [gmail.drafts :as drafts])
   #?(:clj (:import [java.util Base64])))

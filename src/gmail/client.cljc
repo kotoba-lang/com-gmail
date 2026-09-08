@@ -13,7 +13,7 @@
   OAuth2 consent flow itself) is out of scope for this library -- callers
   pass a valid token, the same way cloudflare.client expects a
   CLOUDFLARE_API_TOKEN rather than performing its own auth flow."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             #?(:clj [gmail.retry :as retry])
             #?(:clj [json.data-json :as json])))
 
