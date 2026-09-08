@@ -24,7 +24,7 @@
   Reuses gmail.client/api-base (a plain, portable, non-reader-conditional
   `def`) rather than redefining the base URL."
   (:require [gmail.client :as client]
-            [clojure.string :as str]))
+            [kotoba.lang.text :as str]))
 
 (defn- auth-headers [token]
   {"Authorization" (str "Bearer " token)
@@ -52,7 +52,7 @@
   ([_opts]
    (fn [{:keys [url method headers body]}]
      (-> (js/fetch url
-                   (clj->js (cond-> {:method (str/upper-case (name method))
+                   (clj->js (cond-> {:method (str/upper (name method))
                                      :headers headers}
                               body (assoc :body body))))
          (.then (fn [resp]
