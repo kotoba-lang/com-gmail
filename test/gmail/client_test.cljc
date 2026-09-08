@@ -1,5 +1,5 @@
 (ns gmail.client-test
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [clojure.test :refer [deftest is]]
             [gmail.client :as client]))
 

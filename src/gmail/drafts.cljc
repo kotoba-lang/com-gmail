@@ -2,7 +2,7 @@
   "Gmail draft creation (plain-text reply drafts, optionally with binary
   attachments). REST v1, JVM-only."
   (:require [gmail.client :as client]
-            [clojure.string :as str])
+            [kotoba.lang.text :as str])
   #?(:clj (:import [java.util Base64])))
 
 #?(:clj
