@@ -7,7 +7,7 @@
   Run:  npx nbb test/gmail/async_client_test.cljs   (exits non-zero on any mismatch)"
   (:require [gmail.async-client :as ac]
             [gmail.client :as client]
-            [clojure.string :as str]))
+            [kotoba.lang.text :as str]))
 
 (def failures (atom 0))
 (defn check [label pass?]
