@@ -3,3 +3,6 @@
 target/
 node_modules/
 .nbb.edn.cache/
+
+# nbb dependency cache -- a build artifact, not source
+.nbb/
