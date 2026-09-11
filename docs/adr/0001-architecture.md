@@ -336,7 +336,7 @@ Two implementation notes worth recording:
   and `js/process.exit 1` on mismatch (this repo's nbb pattern, **not**
   cljs.test) -- extended to await Promises via a sequential `.then` chain. Run
   with `npm run test:nbb` (which chains `npx nbb test/gmail/async_*_test.cljs`);
-  CI grows a Node step alongside the existing `clojure -M:test`/`-M:lint`. The
+  CI grows a Node step alongside the existing `kbb -M:test`/`-M:lint`. The
   reused `.cljc` (`gmail.client`) loads fine under nbb because its `#?(:clj
   ...)` forms simply drop out under cljs, leaving only the portable
   `api-base`.

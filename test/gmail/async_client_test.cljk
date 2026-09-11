@@ -4,7 +4,7 @@
   mail-archive's datascript_contract_test.cljs (this repo's nbb convention --
   NOT cljs.test), extended to await Promises via a sequential `.then` chain.
 
-  Run:  npx nbb test/gmail/async_client_test.cljk   (exits non-zero on any mismatch)"
+  Run:  kbb --backend sci test/gmail/async_client_test.cljk   (exits non-zero on any mismatch)"
   (:require [gmail.async-client :as ac]
             [gmail.client :as client]
             [kotoba.lang.text :as str]))

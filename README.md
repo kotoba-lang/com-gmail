@@ -162,7 +162,7 @@ deliberately left to the caller.
 ## Tests
 
 ```sh
-clojure -M:test          # JVM: every .cljc namespace (client/threads/labels/drafts/
+kbb -M:test          # JVM: every .cljc namespace (client/threads/labels/drafts/
                          #      history/mime/attachments/retry/watch), stubbed :http-fn
 npm ci && npm run test:nbb   # cljs/nbb: the async read surface (gmail.async-*)
 ```
