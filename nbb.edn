@@ -3,10 +3,10 @@
 ;; gmail.async-history from `src`, their tests from `test`, and the reused
 ;; gmail.client/api-base (a plain portable def in a .cljc; nbb reads the .cljc
 ;; and the #?(:clj ...) forms simply drop out under cljs) also from `src`, when
-;; running e.g. `npx nbb test/gmail/async_client_test.cljk`.
+;; running e.g. `kbb --backend sci test/gmail/async_client_test.cljk`.
 ;; The JVM/.cljc namespaces (client transport, threads, labels, drafts,
 ;; history, mime, attachments, retry, watch) are NOT on the nbb side -- they
-;; stay `clojure -M:test`.
+;; stay `kbb -M:test`.
 {:paths ["src" "test"]
  :deps {
         ;; Declared HERE and not only in deps.edn: nbb reads nbb.edn and does NOT

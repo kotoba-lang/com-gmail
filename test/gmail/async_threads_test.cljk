@@ -1,6 +1,6 @@
 (ns gmail.async-threads-test
   "nbb test for gmail.async-threads (async, read-only list/get).
-  Run:  npx nbb test/gmail/async_threads_test.cljk"
+  Run:  kbb --backend sci test/gmail/async_threads_test.cljk"
   (:require [gmail.async-threads :as threads]
             [gmail.client :as client]))
 
