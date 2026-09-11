@@ -1,6 +1,6 @@
 (ns gmail.async-history-test
   "nbb test for gmail.async-history (async, read-only users.history.list).
-  Run:  npx nbb test/gmail/async_history_test.cljs"
+  Run:  npx nbb test/gmail/async_history_test.cljk"
   (:require [gmail.async-history :as history]
             [gmail.client :as client]))
 
