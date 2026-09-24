@@ -1,5 +1,5 @@
 (ns gmail.drafts-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [kotoba.test :refer [deftest is]]
             [kotoba.lang.text :as str]
             [gmail.client :as client]
             [gmail.drafts :as drafts])

@@ -1,6 +1,6 @@
 (ns gmail.client-test
   (:require [kotoba.lang.text :as str]
-            [clojure.test :refer [deftest is]]
+            [kotoba.test :refer [deftest is]]
             [gmail.client :as client]))
 
 (defn- stub-http-fn [status body]
