@@ -1,5 +1,5 @@
 (ns gmail.mime-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [kotoba.test :refer [deftest is]]
             [gmail.mime :as mime])
   #?(:clj (:import [java.util Base64])))
 

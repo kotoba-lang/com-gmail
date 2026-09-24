@@ -1,5 +1,5 @@
 (ns gmail.watch-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [kotoba.test :refer [deftest is]]
             [gmail.client :as client]
             [gmail.watch :as watch]))
 
