@@ -1,14 +1,13 @@
 (ns gmail.mime-test
-  (:require [kotoba.test :refer [deftest is]]
-            [gmail.mime :as mime])
-  #?(:clj (:import [java.util Base64])))
+  (:require [kotoba.bytes :as kbytes] [kotoba.test :refer [deftest is]]
+            [gmail.mime :as mime]))
 
 #?(:clj
 (defn- enc
   "Base64url-encode a UTF-8 string, the exact shape Gmail puts in a part's
   `:body :data` -- so fixtures below encode the same way real payloads do."
   [^String s]
-  (.encodeToString (Base64/getUrlEncoder) (.getBytes s "UTF-8"))))
+  (kbytes/base64url-encode (kbytes/utf8-bytes s))))
 
 (deftest decode-body-data-round-trips-a-utf8-string-through-base64url
   (is (= "Hello, 世界! plus more" (mime/decode-body-data (enc "Hello, 世界! plus more")))))

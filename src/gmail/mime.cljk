@@ -15,8 +15,7 @@
 
   Pure `.cljc` shape; the base64 decode is JVM-only (`java.util.Base64`),
   the same single-platform posture as gmail.drafts' encoder."
-  (:require [kotoba.lang.text :as str])
-  #?(:clj (:import [java.util Base64])))
+  (:require [kotoba.bytes :as kbytes] [kotoba.lang.text :as str]))
 
 #?(:clj
 (defn decode-body-data
@@ -28,7 +27,7 @@
   `:data` straight through without guarding it first."
   ^String [b64url]
   (when-not (str/blank? b64url)
-    (String. (.decode (Base64/getUrlDecoder) ^String b64url) "UTF-8"))))
+    (kbytes/utf8-string (kbytes/base64url-decode-bytes ^String b64url)))))
 
 #?(:clj
 (defn header

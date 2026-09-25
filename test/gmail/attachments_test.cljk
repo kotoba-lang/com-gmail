@@ -1,11 +1,10 @@
 (ns gmail.attachments-test
-  (:require [kotoba.test :refer [deftest is]]
+  (:require [kotoba.bytes :as kbytes] [kotoba.test :refer [deftest is]]
             [gmail.client :as client]
-            [gmail.attachments :as attachments])
-  #?(:clj (:import [java.util Base64])))
+            [gmail.attachments :as attachments]))
 
 #?(:clj
-(defn- b64url [^bytes bs] (.encodeToString (Base64/getUrlEncoder) bs)))
+(defn- b64url [^bytes bs] (kbytes/base64url-encode bs)))
 
 (deftest get-attachment-hits-the-messages-attachments-endpoint
   (let [captured (atom nil)

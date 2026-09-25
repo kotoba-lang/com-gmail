@@ -11,8 +11,7 @@
   NOT `/threads/...` -- but gmail.client/api-base already ends in
   `/users/me`, so the path is just the message/attachment tail. REST v1,
   JVM-only, same injectable-`:http-fn` posture as every other namespace here."
-  (:require [gmail.client :as client])
-  #?(:clj (:import [java.util Base64])))
+  (:require [kotoba.bytes :as kbytes] [gmail.client :as client]))
 
 #?(:clj
 (defn get-attachment
@@ -36,4 +35,4 @@
   ([message-id attachment-id] (attachment-bytes message-id attachment-id {}))
   ([message-id attachment-id http-opts]
    (when-let [data (:data (get-attachment message-id attachment-id http-opts))]
-     (.decode (Base64/getUrlDecoder) ^String data)))))
+     (kbytes/base64url-decode-bytes ^String data)))))

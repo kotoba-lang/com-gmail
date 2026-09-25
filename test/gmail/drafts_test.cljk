@@ -1,12 +1,11 @@
 (ns gmail.drafts-test
-  (:require [kotoba.test :refer [deftest is]]
+  (:require [kotoba.bytes :as kbytes] [kotoba.test :refer [deftest is]]
             [kotoba.lang.text :as str]
             [gmail.client :as client]
-            [gmail.drafts :as drafts])
-  #?(:clj (:import [java.util Base64])))
+            [gmail.drafts :as drafts]))
 
 #?(:clj
-(defn- decode [raw] (String. (.decode (Base64/getUrlDecoder) ^String raw) "UTF-8")))
+(defn- decode [raw] (kbytes/utf8-string (kbytes/base64url-decode-bytes ^String raw))))
 
 (deftest ->raw-message-encodes-a-plain-text-rfc2822-message
   (let [raw (drafts/->raw-message {:to "a@example.com" :subject "hi" :body "hello"})
@@ -53,7 +52,7 @@
 
 #?(:clj
 (deftest ->raw-message-builds-a-multipart-message-with-one-attachment
-  (let [svg-bytes (.getBytes "<svg></svg>" "UTF-8")
+  (let [svg-bytes (kbytes/utf8-bytes "<svg></svg>")
         decoded (decode (drafts/->raw-message
                           {:to "a@example.com" :subject "hi" :body "hello"
                            :attachments [{:filename "diagram.svg" :content-type "image/svg+xml" :bytes svg-bytes}]}))]
@@ -68,14 +67,14 @@
           part-re (re-pattern (str "Content-Transfer-Encoding: base64\\r\\n\\r\\n([^\\r]+(?:\\r\\n[^\\r-]+)*)\\r\\n--" boundary "--"))
           b64 (second (re-find part-re decoded))]
       (is (some? b64))
-      (is (= "<svg></svg>" (String. (.decode (Base64/getMimeDecoder) (str/replace b64 #"\r\n" "")) "UTF-8")))))))
+      (is (= "<svg></svg>" (kbytes/utf8-string (kbytes/base64mime-decode-bytes (str/replace b64 #"\r\n" "")))))))))
 
 #?(:clj
 (deftest ->raw-message-supports-multiple-attachments
   (let [decoded (decode (drafts/->raw-message
                           {:to "a@example.com" :subject "hi" :body "hello"
-                           :attachments [{:filename "a.svg" :content-type "image/svg+xml" :bytes (.getBytes "A" "UTF-8")}
-                                        {:filename "b.svg" :content-type "image/svg+xml" :bytes (.getBytes "B" "UTF-8")}]}))]
+                           :attachments [{:filename "a.svg" :content-type "image/svg+xml" :bytes (kbytes/utf8-bytes "A")}
+                                        {:filename "b.svg" :content-type "image/svg+xml" :bytes (kbytes/utf8-bytes "B")}]}))]
     (is (re-find #"filename=\"a\.svg\"" decoded))
     (is (re-find #"filename=\"b\.svg\"" decoded)))))
 

@@ -13,7 +13,7 @@
   OAuth2 consent flow itself) is out of scope for this library -- callers
   pass a valid token, the same way cloudflare.client expects a
   CLOUDFLARE_API_TOKEN rather than performing its own auth flow."
-  (:require [kotoba.lang.text :as str]
+  (:require [kotoba.bytes :as kbytes] [kotoba.lang.text :as str]
             #?(:clj [gmail.retry :as retry])
             #?(:clj [json.data-json :as json])))
 
@@ -75,7 +75,7 @@
   documented as out of scope in gmail.history's ADR addendum."
   ^String [v]
   (let [sb (StringBuilder.)]
-    (doseq [b (.getBytes (str v) "UTF-8")]
+    (doseq [b (kbytes/utf8-bytes (str v))]
       (let [c (bit-and b 0xff)
             ch (char c)]
         (if (or (and (>= c (int \A)) (<= c (int \Z)))
