@@ -41,6 +41,6 @@
 (deftest watch-throws-on-non-2xx
   (let [http-fn (fn [_req] {:status 403 :body "{\"error\":\"no publish rights\"}"})]
     (is (thrown-with-msg?
-         #?(:clj clojure.lang.ExceptionInfo :cljs js/Error)
+         js/Error
          #"Gmail API request failed"
          (watch/watch! "projects/p/topics/t" {:http-fn http-fn :token "t"})))))

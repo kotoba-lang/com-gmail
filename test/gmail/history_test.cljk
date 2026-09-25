@@ -23,5 +23,5 @@
 
 (deftest list-history-throws-on-non-2xx
   (let [http-fn (fn [_req] {:status 404 :body "{\"error\":\"historyId too old\"}"})]
-    (is (thrown? #?(:clj clojure.lang.ExceptionInfo :cljs js/Error)
+    (is (thrown? js/Error
                  (history/list-history "1" {:http-fn http-fn :token "t"})))))

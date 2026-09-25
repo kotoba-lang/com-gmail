@@ -1,7 +1,7 @@
 (ns gmail.drafts
   "Gmail draft creation (plain-text reply drafts, optionally with binary
   attachments). REST v1, JVM-only."
-  (:require [gmail.client :as client]
+  (:require [kotoba.bytes :as kbytes] [gmail.client :as client]
             [kotoba.lang.text :as str])
   #?(:clj (:import [java.util Base64])))
 
@@ -10,7 +10,7 @@
   "URL-safe base64 for the OUTER message -- the encoding Gmail's
   message.raw field itself requires."
   ^String [^String s]
-  (.encodeToString (Base64/getUrlEncoder) (.getBytes s "UTF-8"))))
+  (.encodeToString (Base64/getUrlEncoder) (kbytes/utf8-bytes s))))
 
 #?(:clj
 (defn- std-base64-encode
